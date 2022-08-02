@@ -9,8 +9,7 @@ from six.moves import zip
 
 class KeyMaker:
     def __init__(self, *args, **kargs):
-        self.dct = kargs
-        self.dct.update(dict([(x,operator.attrgetter(x)) for x in args]))
+        self.dct = kargs | [(x,operator.attrgetter(x)) for x in args]
         self.default = None
         if args:
             self.default = operator.attrgetter(args[0])
@@ -20,14 +19,11 @@ class KeyMaker:
         return item in self.dct
 
     def getter_one(self,name):
-        if name in self:
-            return self[name]
-        return self[self.default]
+        return self[name] if name in self else self[self.default]
 
     def getter(self, name):
         if type(name) is str:
-            sk = name.split(",")
-            if sk:
+            if sk := name.split(","):
                 names,getters = list(zip(*[(x,self.getter_one(x)) for x in sk if x in self]))
                 return list(names),lambda x:tuple( g(x) for g in getters )
         return [],self.default

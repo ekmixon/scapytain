@@ -151,7 +151,7 @@ def get_all_tables():
 
 def create_tables():
     for o in get_all_tables():
-        print("Creating table [%s]" % o.__name__)
+        print(f"Creating table [{o.__name__}]")
         o.createTable()
     print("Populating Meta table")
     Meta(tag="dbversion", value=DB_VERSION)
@@ -170,9 +170,8 @@ def dump_table(t):
     import pprint
     cols = t.sqlmeta.columns.keys()
     table=[cols]
-    print("Dumping table [%s]" % t.__name__)
-    for row in t.select():
-        table.append([getattr(row,k) for k in cols])
+    print(f"Dumping table [{t.__name__}]")
+    table.extend([getattr(row,k) for k in cols] for row in t.select())
     pprint.pprint(table)
 
 def counter(fmt="%i",start=0):
@@ -208,7 +207,7 @@ def import_uts_data(uts_data, test_plan=None, test_plan_ref=None, testref="TEST%
                     prev_test_spec.keywords = l[1:].strip()
                 elif obj is not None:
                     obj.keywords = l[1:].strip()
-                elif test_plan:
+                else:
                     test_plan.keywords = l[1:].strip()
         elif l[0] == "%":
             if test_plan:
@@ -233,9 +232,8 @@ def import_uts_data(uts_data, test_plan=None, test_plan_ref=None, testref="TEST%
         elif l[0] == "*":
             if test_spec is not None:
                 test_spec.description += l[1:]
-        else:
-            if test is not None:
-                test.code += l
+        elif test is not None:
+            test.code += l
 
 def _resolve_testfiles(testfiles, scapy):
     for tfile in testfiles[:]:
@@ -256,7 +254,7 @@ def import_utsc_data(utsc_file, reference=None, test_mean=None):
         if reference is None:
             reference = "No ref yet"
         test_mean = Test_Mean(reference=reference, name=name, code_init="")
-    
+
     data = json.loads(utsc_data)
     testfiles = []
     code_init = []
@@ -293,7 +291,7 @@ def import_utsc_data(utsc_file, reference=None, test_mean=None):
         camp = Campaign(name=name, reference=test_mean.reference, test_mean=test_mean)
         for t in testfiles:
             name = os.path.split(t)[1]
-            test_plan = Test_Plan(reference="Test %s" % name, name=name)
+            test_plan = Test_Plan(reference=f"Test {name}", name=name)
             import_uts_file(t, test_plan=test_plan, add_dependency=True)
             camp.addTest_Plan(test_plan)
 

@@ -39,7 +39,7 @@ class ScapyProxy(object):
         else:
             res = 0
         err = sys.last_value
-        exn = "%s: %s" % (err.__class__.__name__, str(err))
+        exn = f"{err.__class__.__name__}: {str(err)}"
         return res, output, exn
 
     def run_tests_from_tspec(self, tests, init=None):
@@ -55,7 +55,7 @@ class ScapyProxy(object):
         if init:
             res_val, res, exn = self.run(init)
             if res_val != 1:
-                log.error("Init code returned %s" % ["failed", "sucess", "exception"][res_val])
+                log.error(f'Init code returned {["failed", "sucess", "exception"][res_val]}')
                 if res_val == 0:
                     log.error("Exception = [%r]" % exn)
         for x in lst:
@@ -66,11 +66,11 @@ class ScapyProxy(object):
         if init:
             res_val, res, exn = self.run(init)
             if res_val != 1:
-                log.error("Init code returned %s" % ["failed", "sucess", "exception"][res_val])
+                log.error(f'Init code returned {["failed", "sucess", "exception"][res_val]}')
                 if res_val == 2:
                     log.error("Exception = [%r]" % exn)
 
-            
+
         done = []
         failed = []
         while lst:
@@ -89,12 +89,11 @@ class ScapyProxy(object):
             tcode = key(x)
             code = tcode.code
             tspec = tcode.test_spec
-            if keywords:
-                if not keywords(tcode):
-                    done.append(tspec)
-                    yield x, (4,"",None) # In the list it's 4, the real status number is 8
-                    continue
-            
+            if keywords and not keywords(tcode):
+                done.append(tspec)
+                yield x, (4,"",None) # In the list it's 4, the real status number is 8
+                continue
+
             if depfailed:
                 res_val,res,exn = result = 3,"",None
             else:

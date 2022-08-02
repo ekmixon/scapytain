@@ -15,6 +15,8 @@ console_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
 log.addHandler(console_handler)
 
 
+
+
 class conf:
     _loaded = False
     _sem = Semaphore(1)
@@ -30,7 +32,7 @@ class conf:
     ssl_key = None
     auth = True
     database = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scapytain.db")).replace("\\", "/")
-    db = "sqlite:/" + database
+    db = f"sqlite:/{database}"
     loglevel=1
     # users
     users = {}
@@ -39,13 +41,13 @@ class conf:
 def get_config(configfile=None):
     conf._sem.acquire()
     if not conf._loaded:
-        
+
         config = six.moves.configparser.ConfigParser()
         if configfile is None:
             configfile=['scapytainrc',os.path.expanduser('~/.scapytainrc'),'/etc/scapytainrc']
         cf=config.read(configfile)
-        log.info("Configuration loaded from [%s]" % ":".join(cf))
-        
+        log.info(f'Configuration loaded from [{":".join(cf)}]')
+
         for sec in config.sections():
             for opt,optarg in config.items(sec):
                 if sec == "paths":
@@ -74,10 +76,10 @@ def get_config(configfile=None):
                         conf.auth = config.getboolean(sec, opt)
                     elif opt == "database":
                         conf.database = optarg
-                        conf.db = "sqlite:/" + database
+                        conf.db = f"sqlite:/{database}"
                 elif sec == "users":
                     conf.users = dict(config.items(sec))
-    
+
         log.setLevel(conf.loglevel)
         conf._loaded = True
     conf._sem.release()

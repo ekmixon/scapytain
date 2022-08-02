@@ -13,7 +13,7 @@ from . import config
 
 conf = config.get_config()
 
-HIGHLIGHT="%s -u utf-8 -S py" % conf.highlight_path
+HIGHLIGHT = f"{conf.highlight_path} -u utf-8 -S py"
 
 def highlight_python(py):
     if type(py) is six.text_type:
@@ -25,10 +25,10 @@ def highlight_python(py):
         w.close()
     except IOError:
         pass
-    
+
     html = r.read()
     if html == "":
-        html="<pre>%s</pre>" % py
+        html = f"<pre>{py}</pre>"
     else:
         html=html[html.find("<pre"):html.find("</pre>")+7]
     return html.decode("utf-8")

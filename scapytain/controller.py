@@ -207,12 +207,10 @@ class Root(object):
         if tspec_id is None:
             sortkey,sortkey_getter=sortkeys.tests.getter(sortkey)
             stream = loader.load('tests.xml').generate(tspecs=Test_Spec.select(),groups=Test_Group.select(),
-	                                               sortkey=sortkey,rev=rev,sortkey_getter=sortkey_getter)
+            sortkey=sortkey,rev=rev,sortkey_getter=sortkey_getter)
         else:
             diff=(diff != "0")
-            differ=None
-            if diff:
-                differ=difflib.HtmlDiff()
+            differ = difflib.HtmlDiff() if diff else None
             tspec = validate.TestSpecId().to_python(tspec_id)
             stream = loader.load('test.xml').generate(tspec=tspec,hl_python=highlight_python,
                                                       differ=differ,test_means=Test_Mean.select())
@@ -266,10 +264,8 @@ class Root(object):
 
         parents = self.get_all_parents(tspec.parents)
         children = self.get_all_children(tspec.children)
-        
-        s = 'digraph test_dep {\n'
-        s += '\tnode [shape="box", style="filled"];\n'
-        
+
+        s = 'digraph test_dep {\n' + '\tnode [shape="box", style="filled"];\n'
         # current node
         s += '\tnode [fillcolor="#0099d8"];\n'
         s += node(tspec)
@@ -295,7 +291,7 @@ class Root(object):
             for cc in c.children:
                 s += link(c,cc)
         s += "}\n"
-        with tempfile.TemporaryFile(prefix="scapytain", suffix="." + format) as tf:
+        with tempfile.TemporaryFile(prefix="scapytain", suffix=f".{format}") as tf:
             target = tf.name
         do_graph(s, target=target)
         with open(target, "rb") as tf:
@@ -305,8 +301,7 @@ class Root(object):
     @cherrypy.expose
     def test_graph(self, tspec_id):
         tspec = validate.TestSpecId().to_python(tspec_id)
-        png = self.get_dependencies_graph(tspec, format="png")
-        if png:
+        if png := self.get_dependencies_graph(tspec, format="png"):
             cherrypy.response.headers['Content-Type'] = "image/png"
             return png
         else:
@@ -402,7 +397,7 @@ class Root(object):
         init=None
         if tmean:
             init=tmean.code_init
-        
+
 
         if cherrypy.request.method == 'POST':
             try:
@@ -418,7 +413,7 @@ class Root(object):
                         code = valid_data["code"]
                         version = len(tspec.tests)+1
                         comment = valid_data["comment"]
-                        
+
                     deps = [x.tests[-1] for x in self.get_all_parents([tspec])]
                     deps[-1]  = fake_tcode
                     test_runner = scapy.run_tests_from_tcode(deps,init=init)
@@ -427,9 +422,9 @@ class Root(object):
                         results.append((t,[Status_Failed,Status_Passed,Status_Stopped][res_val],res))
                         if res_val != 1:
                             break
-            
+
                     not_done = deps[len(results):]
-            
+
                     if t != fake_tcode:
                         status = Status_Dependency_Failed
                         exn = None
@@ -437,7 +432,7 @@ class Root(object):
                         result = None
                     else:
                         _,status,result = results.pop()
-            
+
                     results.reverse()
                     not_done.reverse()
 
@@ -452,7 +447,7 @@ class Root(object):
                         for tst in tspec.tests:
                             for res in tst.results:
                                 self.outdate_result(res)
-                        
+
                     raise cherrypy.HTTPRedirect("/test/%i" % tspec.id)
 
         tmpl = loader.load('edit_test_code.xml')
@@ -466,10 +461,10 @@ class Root(object):
         tspec = validate.TestSpecId().to_python(tspec_id)
         if tmean_id == "none":
             tmean_id = None
-        tmean = validate.TestMeanId().to_python(tmean_id)
-        init=None
-        if tmean:
-            init=tmean.code_init
+        if tmean := validate.TestMeanId().to_python(tmean_id):
+            init = tmean.code_init
+        else:
+            init = None
         version = validators.Int(min=0, max=len(tspec.tests)).to_python(version)
         tcode = tspec.tests[version-1]
 
@@ -619,15 +614,15 @@ class Root(object):
                                       reference=None,
                                       context="")
                     except cherrypy.HTTPRedirect as e:
-                        raise cherrypy.HTTPRedirect("/launch_run/%s" % e.urls[0].split("/")[-1])
+                        raise cherrypy.HTTPRedirect(f'/launch_run/{e.urls[0].split("/")[-1]}')
                 elif post_data.get("resume_quick_run", False):
                     camp.campaign_runs.sort(key=lambda o: o.date)
                     last_run = camp.campaign_runs[0]
-                    raise cherrypy.HTTPRedirect("/launch_run/%s" % last_run.id)
+                    raise cherrypy.HTTPRedirect(f"/launch_run/{last_run.id}")
                 elif post_data.get("actions_runs", False):
                     selected = []
                     for run in camp.campaign_runs:
-                        if post_data.get("check_%s" % run.id, False):
+                        if post_data.get(f"check_{run.id}", False):
                             selected.append(run)
                     if post_data.get("delete", False):
                         def txn():
@@ -642,14 +637,15 @@ class Root(object):
                             if camp_id in CAMPAIGNS_CACHE:
                                 del CAMPAIGNS_CACHE[camp_id]
                         DO_TXN(txn)
-            action = "/campaign/%s" % camp_id
+            action = f"/campaign/{camp_id}"
             sortkey,sortkey_getter=sortkeys.campaign_runs.getter(sortkey)
             def get_cls(objr):
                 try:
                     return next(r.status.css_class for r in objr.results if r.status.id not in [4, 6])
                 except StopIteration:
                     return objr.results[0].status.css_class
-            if not camp_id in CAMPAIGNS_CACHE:
+
+            if camp_id not in CAMPAIGNS_CACHE:
                 CAMPAIGNS_CACHE[camp_id] = sortkeys.organized_campaign_runs(camp)
             stream = loader.load('campaign.xml').generate(action=action,
                                                           camp=camp,
@@ -787,9 +783,14 @@ class Root(object):
         src_run = validate.CampaignRunId().to_python(run_id)
         camp = src_run.campaign
         def txn():
-            dst_run = Campaign_Run(campaign=camp, test_mean=src_run.test_mean,
-                                   reference=camp.reference+"-run%02i" % len(list(camp.campaign_runs)),
-                                   name="Failed tests from %s" % src_run.name)
+            dst_run = Campaign_Run(
+                campaign=camp,
+                test_mean=src_run.test_mean,
+                reference=camp.reference
+                + "-run%02i" % len(list(camp.campaign_runs)),
+                name=f"Failed tests from {src_run.name}",
+            )
+
             seen_tests = {}
             for s_test_plan_r in src_run.test_plan_results:
                 d_test_plan_r = None
@@ -808,6 +809,7 @@ class Root(object):
                             dobjr.addResult(seen_tests[tst])
             self.resolve_run_dependencies(dst_run)
             return dst_run
+
         dst_run = DO_TXN(txn)
         raise cherrypy.HTTPRedirect("/campaign_run/%i" % dst_run.id)
 
@@ -838,11 +840,12 @@ class Root(object):
                 return present
             elif tm.keywords_mode == 1:
                 return not present
+
         init = None
         if tm:
             init=tm.code_init
         test_runner = scapy.run_tests_with_dependencies(results, lambda r:r.test, init=init, keywords=keywords_check)
-        
+
         def add_test_runner(stream):
             for kind,data,pos in stream:
                 yield (kind, data, pos)
@@ -860,8 +863,7 @@ class Root(object):
                           tag.td(result.test.test_spec.name),
                           tag.td(tag.a(result.status.status,
                                        href="/result/%i"%result.id)))
-                        for x in t.generate():
-                            yield x
+                        yield from t.generate()
                         if result.status.id == Status_Stopped.id:
                             t = tag.tr()
                             t(tag.td(tag.span(str(exn),class_="error"),
@@ -869,16 +871,14 @@ class Root(object):
                                      tag.form(tag.input(type="submit",value="Situation resolved, resume tests."),
                                               method="POST",action="/launch_run/%i"%run.id),
                                      colspan="3",align="center"))
-                            for x in t.generate():
-                                yield x
+                            yield from t.generate()
                             break
                         else:
                             result.completed=True
                     else:
                         t = tag.tr(tag.th("Test finished!",colspan="3",align="center"))
-                        for x in t:
-                            yield x
-                            
+                        yield from t
+
         tmpl = loader.load('launch_run.xml')
         stream = tmpl.generate(run=run) | add_test_runner
         return stream.serialize('html', doctype='html')
@@ -933,7 +933,7 @@ class Root(object):
                 error=str(e)
             else:
                 raise cherrypy.HTTPRedirect("/test_plan/")
-        objct = u"Test Plan %s (%s)" % (test_plan.reference,test_plan.name)
+        objct = f"Test Plan {test_plan.reference} ({test_plan.name})"
         return loader.load('delete.xml').generate(object=objct,error=error,
                                                   menu={'test_plan':test_plan_id},
                                                   test_plan=test_plan,
@@ -951,7 +951,7 @@ class Root(object):
                 error=str(e)
             else:
                 raise cherrypy.HTTPRedirect("/test_plan/%i"%test_plan.id)
-        objct = object=u"Objective %s (%s)" % (obj.reference,obj.name)
+        objct = object = f"Objective {obj.reference} ({obj.name})"
         action="/delete_objective/%i"%obj.id
         return loader.load('delete.xml').generate(object=objct,
                                                   menu={'objective':obj_id},
@@ -970,7 +970,7 @@ class Root(object):
                 error=str(e)
             else:
                 raise cherrypy.HTTPRedirect("/campaign/")
-        objct = object=u"Campaign %s (%s)" % (camp.reference,camp.name)
+        objct = object = f"Campaign {camp.reference} ({camp.name})"
         action="/delete_campaign/%i"%camp.id
         return loader.load('delete.xml').generate(object=objct,
                                                   menu={'campaign':camp_id},
@@ -992,7 +992,7 @@ class Root(object):
                 error=str(e)
             else:
                 raise cherrypy.HTTPRedirect("/test/")
-        objct = object=u"Test %s (%s)" % (tspec.reference,tspec.name)
+        objct = object = f"Test {tspec.reference} ({tspec.name})"
         action="/delete_test/%i"%tspec.id
         return loader.load('delete.xml').generate(object=objct,
                                                   menu={"tspec":tspec_id},
@@ -1043,7 +1043,7 @@ class Root(object):
                 error=str(e)
             else:
                 raise cherrypy.HTTPRedirect("/test_mean/")
-        objct = object=u"Test Mean %s (%s)" % (tm.reference,tm.name)
+        objct = object = f"Test Mean {tm.reference} ({tm.name})"
         action="/delete_test_mean/%i"%tm.id
         return loader.load('delete.xml').generate(object=objct,
                                                   menu={"test_mean":tm_id},
@@ -1059,7 +1059,10 @@ class Root(object):
         tmpl = loader.load('report_project.rml')
         stream = tmpl.generate(proj=proj)
         cherrypy.response.headers['Content-Type'] = "application/pdf"
-        cherrypy.response.headers['Content-Disposition'] = "attachement; filename=Project_%s.pdf" % proj.reference.replace(" ","_")
+        cherrypy.response.headers[
+            'Content-Disposition'
+        ] = f'attachement; filename=Project_{proj.reference.replace(" ", "_")}.pdf'
+
         return trml2pdf.parseString(stream.render())
 
 def main(*args):
@@ -1074,17 +1077,19 @@ def main(*args):
         try:
             res = Meta.selectBy(tag="dbversion")
             if res[0].value != DB_VERSION:
-                raise ScapytainException("Found database version %s while expected version %s" %
-                                         (res[0].value, DB_VERSION))
+                raise ScapytainException(
+                    f"Found database version {res[0].value} while expected version {DB_VERSION}"
+                )
+
         except ScapytainException:
             raise
         except Exception as e:
-            raise ScapytainException("Error while checking database version (%s)" % e)
-            
+            raise ScapytainException(f"Error while checking database version ({e})")
+                        
 
         global Status_Not_Done,Status_Stopped,Status_Failed,Status_Passed,Status_Skipped
         global Status_Outdated_Failed,Status_Outdated_Passed,Status_Dependency_Failed
-        
+
         Status_Not_Done=Status.get(1)
         Status_Stopped=Status.get(2)
         Status_Failed=Status.get(3)
